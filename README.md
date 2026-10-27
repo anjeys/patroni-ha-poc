@@ -1,7 +1,7 @@
 # PostgreSQL high availability: Patroni, etcd, pgBackRest
 
-[![lint](https://github.com/Anjeys/patroni-ha-poc/actions/workflows/lint.yml/badge.svg)](https://github.com/Anjeys/patroni-ha-poc/actions/workflows/lint.yml)
-[![drills](https://github.com/Anjeys/patroni-ha-poc/actions/workflows/drills.yml/badge.svg)](https://github.com/Anjeys/patroni-ha-poc/actions/workflows/drills.yml)
+[![lint](https://github.com/anjeys/patroni-ha-poc/actions/workflows/lint.yml/badge.svg)](https://github.com/anjeys/patroni-ha-poc/actions/workflows/lint.yml)
+[![drills](https://github.com/anjeys/patroni-ha-poc/actions/workflows/drills.yml/badge.svg)](https://github.com/anjeys/patroni-ha-poc/actions/workflows/drills.yml)
 
 A three-node PostgreSQL cluster with automatic failover, synchronous
 replication and point-in-time recovery, deployed by Ansible onto systemd
@@ -48,7 +48,7 @@ Drill output lands in `evidence/` as JSON: the method, the intervals, the
 marker, and whether it survived.
 The same drills run weekly in CI (`drills` workflow); each run uploads its
 `evidence/` as an artifact.
-A snapshot from CI run [40106965093](https://github.com/Anjeys/patroni-ha-poc/actions/runs/40106965093) is committed in [`docs/evidence/`](docs/evidence/).
+A snapshot from CI run [40106965093](https://github.com/anjeys/patroni-ha-poc/actions/runs/40106965093) is committed in [`docs/evidence/`](docs/evidence/).
 
 ## Failover, measured
 
