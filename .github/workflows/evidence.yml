@@ -1,0 +1,64 @@
+---
+# The evidence bot (ADR-0008): after a drills run on main (schedule or dispatch, never a pull
+# request) its artifact becomes the committed snapshot - docs/evidence/*.json replaced, SUMMARY.md
+# rendered, the README's run id moved - pushed to main with the deploy key of scripts/bot_key.sh:
+# a pull request made with GITHUB_TOKEN gets no checks and stays blocked by the ruleset (004b-probe),
+# a push with GITHUB_TOKEN is refused (004c-probe), the deploy key is the ruleset's bypass actor.
+# The commit touches docs/ and the README only; lint runs on it as on any push to main.
+name: evidence
+"on":
+  workflow_run:
+    workflows: [drills]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  publish:
+    name: commit the evidence snapshot
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c  # v2.23.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: The run's artifact into docs/evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" --name "drill-evidence-$RUN_ID" --dir evidence
+          count="$(find evidence -name '*.json' | wc -l)"
+          [ "$count" -ge 4 ] || { echo "only $count evidence files in the artifact"; exit 1; }
+          git rm -q 'docs/evidence/*.json'
+          mkdir -p docs/evidence
+          cp evidence/*.json docs/evidence/
+          { echo "# Evidence of CI run $RUN_ID"; echo; python3 scripts/lib/evidence_summary.py; } > docs/evidence/SUMMARY.md
+          sed -i -E "s#actions/runs/[0-9]+#actions/runs/$RUN_ID#g; s#CI run \[[0-9]+\]#CI run [$RUN_ID]#" README.md
+          git add docs/evidence README.md
+          git status --short
+      - name: Push to main with the deploy key
+        env:
+          DEPLOY_KEY: ${{ secrets.EVIDENCE_BOT_KEY }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          [ -n "$DEPLOY_KEY" ] || { echo "no EVIDENCE_BOT_KEY secret: scripts/bot_key.sh rotate"; exit 1; }
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          git config user.name evidence-bot
+          git config user.email evidence-bot@users.noreply.github.com
+          git commit -qm "docs: evidence snapshot from CI run $RUN_ID (evidence bot)"
+          GIT_SSH_COMMAND='ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes' \
+            git push "git@github.com:${GITHUB_REPOSITORY}.git" HEAD:main
