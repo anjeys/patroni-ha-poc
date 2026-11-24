@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lifecycle of the lab.
-#   scripts/lab.sh up      keys + secrets if missing, compose up --build, playbook
+#   scripts/lab.sh up      keys, secrets and the lab PKI if missing, compose up --build, playbook
 #   scripts/lab.sh check   playbook again; fails if anything changed (idempotency)
 #   scripts/lab.sh status  every target up, every rule loaded, nothing firing
 #   scripts/lab.sh versions  the build every branch pin resolved to, into evidence/ (ADR-0006)
@@ -73,10 +73,39 @@ keys() {
   chmod 0600 .ssh/*_ed25519
 }
 
+# One CA per lab in .pki/ (gitignored, like .ssh/) and a certificate per host of the inventory
+# with its name, its address, localhost and the VIP as SANs: PostgreSQL serves it, etcd peers
+# verify each other with it, every client verifies the server against the CA (ADR-0009). A
+# certificate is made again when it no longer verifies or its SANs lost the address (a new LAB_NET).
+pki() {
+  umask 077
+  mkdir -p .pki
+  [[ -f .pki/ca.key ]] || openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 3650 \
+    -subj '/CN=patroni-ha-poc lab CA' -addext 'basicConstraints=critical,CA:TRUE' \
+    -addext 'keyUsage=critical,keyCertSign,cRLSign' -keyout .pki/ca.key -out .pki/ca.crt 2>/dev/null
+  local host ip san made=0
+  while read -r host ip; do
+    san="DNS:$host,DNS:localhost,IP:$ip,IP:127.0.0.1,IP:172.$LAB_NET.0.100"
+    if [[ -f ".pki/$host.crt" ]] && openssl verify -CAfile .pki/ca.crt ".pki/$host.crt" >/dev/null 2>&1 \
+       && [[ "$(openssl x509 -in ".pki/$host.crt" -noout -ext subjectAltName | grep -c "IP Address:$ip,")" == 1 ]]; then
+      continue
+    fi
+    openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -subj "/CN=$host" \
+      -addext "subjectAltName=$san" -keyout ".pki/$host.key" -out ".pki/$host.csr" 2>/dev/null
+    openssl x509 -req -in ".pki/$host.csr" -CA .pki/ca.crt -CAkey .pki/ca.key -CAcreateserial -days 825 \
+      -copy_extensions copy -out ".pki/$host.crt" 2>/dev/null
+    rm -f ".pki/$host.csr"
+    made=$((made + 1))
+  done < <(awk '/ansible_host=/ { for (i = 2; i <= NF; i++) if ($i ~ /^ansible_host=/) { sub(/^ansible_host=/, "", $i); print $1, $i } }' inventory.ini)
+  chmod 0644 .pki/*.crt
+  echo ">>> .pki: the lab CA, $made certificate(s) made, $(find .pki -name '*.crt' | wc -l) present (gitignored)"
+}
+
 # Secrets are generated once and stored vault-encrypted; the vault password is
 # the only clear-text secret on the control node and is gitignored too.
 SECRETS=group_vars/all/secrets.yml
-SECRET_KEYS=(pg_superuser_password pg_replication_password patroni_restapi_password pgbouncer_auth_password)
+SECRET_KEYS=(pg_superuser_password pg_replication_password patroni_restapi_password pgbouncer_auth_password
+             etcd_root_password etcd_patroni_password)
 
 # ansible.cfg names the vault password file, so vault commands need no flag
 # (a flag on top of it creates two "default" vault ids and encrypt refuses).
@@ -97,7 +126,7 @@ secrets() {
 
 case "${1:-}" in
   up)
-    keys; secrets
+    keys; secrets; pki
     SSH_PUBKEY="$(cat .ssh/lab_ed25519.pub)"
     export SSH_PUBKEY
     docker compose up -d --build

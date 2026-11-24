@@ -13,6 +13,17 @@
     mode: '0750'
   when: inventory_hostname in groups['backup_hosts']
 
+# The lab CA on the repository host: the probes of pgbackrest_repo and pgbouncer_auth and the
+# drills connect through the VIP with verify-full (ADR-0009)
+- name: The lab CA for the probes and the drills
+  ansible.builtin.copy:
+    src: ../../../.pki/ca.crt
+    dest: /var/lib/postgresql/ca.crt
+    owner: postgres
+    group: postgres
+    mode: "0644"
+  when: inventory_hostname in groups['backup_hosts']
+
 - name: Deploy configuration for Repository
   ansible.builtin.template:
     src: pgbackrest-repo.conf.j2

@@ -16,8 +16,14 @@ logfile = /var/log/postgresql/pgbouncer.log
 pidfile = /var/run/postgresql/pgbouncer.pid
 user = postgres
 pool_mode = transaction
-; PostgreSQL accepts TLS only (hostssl); no CA, so require, not verify-full
-server_tls_sslmode = require
+; The clients speak TLS only, to this balancer's certificate from the lab CA (its SANs carry the
+; VIP: a client at the VIP verifies it with verify-full); the server side verifies the primary's
+; certificate against the CA (ADR-0009).
+client_tls_sslmode = require
+client_tls_cert_file = /etc/pgbouncer/server.crt
+client_tls_key_file = /etc/pgbouncer/server.key
+server_tls_sslmode = verify-full
+server_tls_ca_file = /etc/pgbouncer/ca.crt
 ; Arithmetic: one user, one database -> at most default_pool_size + reserve_pool_size
 ; = 25 server connections to HAProxy, which allows 100 per backend, against a
 ; PostgreSQL max_connections of 100 that also holds 3 replication slots, 3

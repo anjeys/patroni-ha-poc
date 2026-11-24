@@ -43,10 +43,12 @@ secret() { # secret <key>
 PGPW="$(secret pg_superuser_password)"
 
 # Every query goes through PgBouncer on the access node: that is the path an
-# application takes, and the only one whose downtime is worth measuring.
+# application takes, and the only one whose downtime is worth measuring. TLS with the
+# balancer's certificate verified against the lab CA at the VIP (ADR-0009).
+CA=/var/lib/postgresql/ca.crt    # on the backup host, placed by roles/pgbackrest
 app_sql() { # app_sql <sql>
   docker exec -e PGPASSWORD="$PGPW" "$REPO" \
-    psql -h "$VIP" -p "$APP_PORT" -U postgres -d postgres -Atc "$1" 2>/dev/null
+    psql "host=$VIP port=$APP_PORT user=postgres dbname=postgres sslmode=verify-full sslrootcert=$CA" -Atc "$1" 2>/dev/null
 }
 
 vip_holder() {
@@ -109,10 +111,15 @@ cmd_failover() {
   # leader key, and that measures a switchover, not a failure.
   log "killing $old"
   t0=$SECONDS
-  # Kernel log lines carry seconds since boot; the kill is timestamped on the
-  # same clock so the fence is measured where it happened, not where the
-  # drill first looked for it.
-  local kill_uptime; kill_uptime="$(cut -d' ' -f1 /proc/uptime)"
+  # The fence is a kernel log line, so the kill is stamped in the kernel log too: a
+  # marker written to /dev/kmsg from the leader's container just before the kill and
+  # read back with its own timestamp. No userspace clock matches printk's on every
+  # host - on a WSL laptop they drifted 20 s apart and a 17 s fence read as 37 (005o).
+  local kill_marker kill_uptime
+  kill_marker="patroni-drill-kill-$(date -u +%s)-$RANDOM"
+  docker exec "$old" sh -c "echo '$kill_marker' > /dev/kmsg"
+  kill_uptime="$(docker exec "$old" dmesg 2>/dev/null | grep -F "$kill_marker" | tail -1 | grep -oE '^\[ *[0-9.]+' | tr -d '[ ')"
+  [[ -n "$kill_uptime" ]] || die "the kill marker did not reach the kernel log"
   docker kill -s KILL "$old" >/dev/null
 
   # First interval: the cluster agrees on a new leader.
@@ -292,7 +299,8 @@ cmd_pitr() {
   # and puts the promoted copy back into recovery. An empty namespace leaves
   # it nothing to disagree with: it takes the key and adopts what it finds.
   log "clearing the cluster state so the restored copy becomes the new truth"
-  docker exec "$node" etcdctl --endpoints="http://$(node_ip "$node"):2379" \
+  docker exec "$node" etcdctl --endpoints="https://$(node_ip "$node"):2379" \
+    --cacert=/etc/etcd/pki/ca.crt --user "root:$(secret etcd_root_password)" \
     del --prefix "/db/${SCOPE}/" >/dev/null
 
   docker exec "$node" systemctl start patroni

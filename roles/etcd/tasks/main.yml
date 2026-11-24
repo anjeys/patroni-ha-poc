@@ -38,6 +38,32 @@
     group: etcd
     mode: "0700"
 
+- name: PKI directory
+  ansible.builtin.file:
+    path: /etc/etcd/pki
+    state: directory
+    owner: etcd
+    group: etcd
+    mode: "0750"
+
+# The lab CA and this node's certificate (scripts/lab.sh pki; SAN: name, address, localhost, the
+# VIP): peers verify each other with it, clients verify the server and authenticate by password
+# (ADR-0009). Client certificates are not required: Patroni authenticates with its etcd user.
+- name: CA, the node's certificate and key
+  ansible.builtin.copy:
+    src: "../../../.pki/{{ item.src }}"
+    dest: "/etc/etcd/pki/{{ item.dest }}"
+    owner: etcd
+    group: etcd
+    mode: "{{ item.mode }}"
+  loop:
+    - {src: ca.crt, dest: ca.crt, mode: "0644"}
+    - {src: "{{ inventory_hostname }}.crt", dest: server.crt, mode: "0644"}
+    - {src: "{{ inventory_hostname }}.key", dest: server.key, mode: "0600"}
+  loop_control:
+    label: "{{ item.dest }}"
+  notify: Restart etcd
+
 - name: Configuration
   ansible.builtin.template:
     src: etcd.j2
@@ -58,3 +84,31 @@
     state: started
     enabled: true
     daemon_reload: true
+
+- name: A changed configuration is live before authentication is touched
+  ansible.builtin.meta: flush_handlers
+
+# /health is served without authentication; endpoint health is not once auth is on.
+- name: Etcd answers over TLS
+  ansible.builtin.uri:
+    url: https://127.0.0.1:2379/health
+    ca_path: /etc/etcd/pki/ca.crt
+    return_content: true
+  register: etcd_health
+  # /health comes as text/plain (no parsed json) and a refused attempt registers no content:
+  # the string is read through default (005e/005f-fix)
+  until: etcd_health.status == 200 and '"health":"true"' in (etcd_health.content | default(""))
+  retries: 30
+  delay: 2
+
+# Once, from the first member: root, a patroni user allowed its prefix, authentication on. The
+# script prints a state and never a password; a cluster already authenticating is left alone.
+- name: Authentication bootstrap (root, the patroni user, auth enabled)
+  ansible.builtin.script: auth_bootstrap.sh
+  environment:
+    ETCD_ROOT_PW: "{{ etcd_root_password }}"
+    ETCD_PATRONI_PW: "{{ etcd_patroni_password }}"
+  register: etcd_auth
+  changed_when: "'STATE=changed' in etcd_auth.stdout"
+  run_once: true
+  no_log: true
