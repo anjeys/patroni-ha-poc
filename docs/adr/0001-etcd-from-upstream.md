@@ -1,6 +1,7 @@
 # ADR-0001: etcd from the upstream release, not from Ubuntu
 
-- Status: accepted
+- Status: accepted; the version is a pin of `versions.yml` (3.7.4 at v2.0), moved with its checksum
+  (ADR-0006)
 - Date: 2026-10-22
 
 ## Context
