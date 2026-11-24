@@ -1,0 +1,31 @@
+---
+# A tag v* becomes a release carrying the committed evidence snapshot and its table (ADR-0008):
+# what the README claims at that tag, as files. GITHUB_TOKEN may create releases; no deploy key here.
+name: release
+"on":
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    name: the release with the evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c  # v2.23.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The body from the snapshot
+        run: |
+          set -euo pipefail
+          { echo "Evidence snapshot committed at this tag (docs/evidence/):"; echo;
+            cat docs/evidence/SUMMARY.md 2>/dev/null || echo "(no SUMMARY.md yet)"; } > body.md
+      - uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3  # v3.0.4
+        with:
+          body_path: body.md
+          files: docs/evidence/*.json
+          fail_on_unmatched_files: true

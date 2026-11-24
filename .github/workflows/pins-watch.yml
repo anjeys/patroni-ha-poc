@@ -1,0 +1,56 @@
+---
+# The pins watch (ADR-0008): weekly, the runner (Ubuntu 24.04, the lab's base) adds the PGDG
+# repository the way roles/pgdg does and reads every candidate against the branch pins of
+# versions.yml; the release APIs against the exact pins. A build outside its branch or a newer
+# release is a drift: an issue, not a pull request - a new branch is a decision (ADR-0006), and a
+# pull request from GITHUB_TOKEN gets no checks (004b-probe). One open issue per drift, by title.
+name: pins-watch
+"on":
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  watch:
+    name: candidates and releases against the pins
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c  # v2.23.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The PGDG repository on the runner (read only, nothing installed)
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /usr/share/postgresql-common/pgdg
+          sudo curl -fsS -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -q >/dev/null
+      - name: Drift
+        id: drift
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pip install -q pyyaml
+          python3 scripts/lib/pins_drift.py | tee drift.md
+          echo "lines=$(grep -c '^| DRIFT' drift.md || true)" >> "$GITHUB_OUTPUT"
+          cat drift.md >> "$GITHUB_STEP_SUMMARY"
+      - name: An issue per drift (one open at a time)
+        if: steps.drift.outputs.lines != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          title="pins: $(grep -c '^| DRIFT' drift.md) build(s) or release(s) moved outside the pins"
+          if [ "$(gh issue list --state open --search "in:title \"$title\"" --json number --jq length)" = 0 ]; then
+            gh issue create --title "$title" --label pins --body-file drift.md
+          else
+            echo "an open issue with this title exists"
+          fi
