@@ -15,20 +15,22 @@ table, then check that the last committed row is still there.
 
 | Component | Version | Role |
 |---|---|---|
-| PostgreSQL | 18.6 | the database |
-| Patroni | 4.1.5 | leader election, failover, cluster configuration |
-| etcd | 3.7.2 | consensus; the leader key lives here |
-| pgBackRest | 2.59.3 | WAL archive, backups, point-in-time recovery |
-| HAProxy | 2.8.16 | routes 5000 to the primary, 5001 to replicas |
-| keepalived | 2.2.8 | one virtual address over two access nodes |
-| PgBouncer | 1.26.1 | transaction pooling on 6432 |
-| postgres_exporter / Prometheus | 0.20.1 / 3.15.1 | metrics and six alerting rules on the repository host |
+| PostgreSQL | 18.* | the database |
+| Patroni | 4.1.* | leader election, failover, cluster configuration |
+| etcd | 3.7.4 | consensus; the leader key lives here |
+| pgBackRest | 2.60.* | WAL archive, backups, point-in-time recovery |
+| HAProxy | 2.8.* | routes 5000 to the primary, 5001 to replicas |
+| keepalived | 2.2.* | one virtual address over two access nodes |
+| PgBouncer | 1.26.* | transaction pooling on 6432 |
+| postgres_exporter / Prometheus | 0.21.1 / 3.16.0 | metrics and six alerting rules on the repository host |
 | Ansible | 2.17+ | deployment; `scripts/lab.sh` wraps it |
 
-Versions are pinned to exact apt builds in `group_vars/all/versions.yml`. PGDG
-keeps only the latest build of each package, so a stale pin fails the run
-instead of quietly installing something else; etcd comes from its release
-asset with a SHA-256 the playbook verifies.
+Apt pins in `group_vars/all/versions.yml` name a branch (`18.*`, `4.1.*`): PGDG and
+Ubuntu keep only the latest build of each package, and an exact pin turned the weekly
+drills red the week after a rebuild. The build each run installed is read back and
+written to `evidence/` by `scripts/lab.sh versions`, which fails on a build outside its
+branch (ADR-0006). Release assets - etcd, Prometheus, postgres_exporter - stay exact,
+with a SHA-256 the playbook verifies.
 
 ## Evidence
 
@@ -43,6 +45,7 @@ asset with a SHA-256 the playbook verifies.
 | A killed leader is fenced by the kernel watchdog, and the new leader arms it | `scripts/drill.sh failover`, watchdog section of the evidence | fired 17 s after the kill, 3 s before the leader key would have expired (`ttl: 20`, `safety_margin: 3`); `/dev/watchdog` held by the new leader |
 | PostgreSQL refuses a connection that is not TLS | `psql "sslmode=disable"` against 5000 | `no pg_hba.conf entry`; replication and the pooler connect with `ssl = t` |
 | Every monitoring target is up, every rule loaded, nothing firing | `scripts/lab.sh status` | passes |
+| Every installed build is inside its pinned branch, and which one is recorded | `scripts/lab.sh versions` | `evidence/versions-*.json`, `every_build_in_its_branch: true` |
 
 Drill output lands in `evidence/` as JSON: the method, the intervals, the
 marker, and whether it survived.
@@ -171,3 +174,4 @@ is a weekly cost, not a per-commit one; lint runs on every push.
 - [ADR-0003](docs/adr/0003-single-access-node.md) - one access node, and what that costs (superseded)
 - [ADR-0004](docs/adr/0004-vip-and-backup-host.md) - two access nodes behind a VIP; the repository on its own host
 - [ADR-0005](docs/adr/0005-fencing-tls-monitoring.md) - watchdog fencing, TLS to PostgreSQL, monitoring with alerts
+- [ADR-0006](docs/adr/0006-branch-pins.md) - a package pin is a branch; the build is read at install time and recorded
