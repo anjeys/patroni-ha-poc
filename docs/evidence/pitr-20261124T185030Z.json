@@ -1,11 +1,11 @@
 {
   "schema": "patroni.drill.pitr.v1",
-  "created_at": "2026-11-24T16:09:34+00:00",
+  "created_at": "2026-11-24T18:50:30+00:00",
   "primary": "node3",
-  "restore_target": "2026-11-24 16:08:56",
+  "restore_target": "2026-11-24 18:49:56",
   "damage": "drop table pitr_drill",
   "rows_before": 1,
-  "marker": "pitr-1795536525-31226",
+  "marker": "pitr-1795546186-14661",
   "marker_restored": true,
   "method": "pgbackrest --type=time --target-action=pause --delta restore, then pg_ctl promote with Patroni stopped",
   "disruptive": true

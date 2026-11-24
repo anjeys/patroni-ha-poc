@@ -1,12 +1,12 @@
 {
   "schema": "patroni.drill.access.v1",
-  "created_at": "2026-11-24T16:08:00+00:00",
+  "created_at": "2026-11-24T18:49:18+00:00",
   "method": "docker kill -s KILL on the balancer holding the VIP",
   "killed": "balancer",
   "took_over": "balancer2",
-  "seconds_to_vip_move": 3,
-  "seconds_to_first_write": 3,
-  "marker": "access-1795536476-23221",
+  "seconds_to_vip_move": 4,
+  "seconds_to_first_write": 4,
+  "marker": "access-1795546154-19277",
   "marker_survived": true,
   "database_cluster_touched": false
 }

@@ -54,7 +54,7 @@ marker, and whether it survived.
 The same drills run weekly in CI (`drills` workflow) and on every pull request that touches
 the cluster's code; each run uploads its `evidence/` as an artifact and prints the table in
 its summary.
-A snapshot from CI run [45432641291](https://github.com/anjeys/patroni-ha-poc/actions/runs/45432641291)
+A snapshot from CI run [45462777435](https://github.com/anjeys/patroni-ha-poc/actions/runs/45462777435)
 is committed in [`docs/evidence/`](docs/evidence/) by the evidence bot after every weekly run
 (ADR-0008); its table is `docs/evidence/SUMMARY.md`, and every tag `v*` is a release carrying it.
 

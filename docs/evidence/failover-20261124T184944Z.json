@@ -1,13 +1,13 @@
 {
   "schema": "patroni.drill.failover.v2",
-  "created_at": "2026-11-24T16:08:45+00:00",
+  "created_at": "2026-11-24T18:49:45+00:00",
   "method": "docker kill -s KILL",
   "old_leader": "node2",
   "new_leader": "node3",
-  "seconds_to_new_leader": 25,
-  "seconds_to_first_write": 40,
+  "seconds_to_new_leader": 22,
+  "seconds_to_first_write": 22,
   "write_path": "vip:6432 (pgbouncer, server TLS) -> haproxy:5000 -> primary",
-  "marker": "failover-1795536481-7579",
+  "marker": "failover-1795546159-19708",
   "marker_survived": true,
   "old_leader_rejoined": true,
   "watchdog": {
