@@ -21,7 +21,7 @@
     mode: "0644"
 
 - name: Read the key fingerprint
-  command: gpg --show-keys --with-colons /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+  ansible.builtin.command: gpg --show-keys --with-colons /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
   register: pgdg_key
   changed_when: false
 

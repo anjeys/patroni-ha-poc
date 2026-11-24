@@ -3,6 +3,7 @@
 #   scripts/lab.sh up      keys + secrets if missing, compose up --build, playbook
 #   scripts/lab.sh check   playbook again; fails if anything changed (idempotency)
 #   scripts/lab.sh status  every target up, every rule loaded, nothing firing
+#   scripts/lab.sh versions  the build every branch pin resolved to, into evidence/ (ADR-0006)
 #   scripts/lab.sh down    stop, keep volumes
 #   scripts/lab.sh reset   DESTRUCTIVE: stop and drop volumes
 set -Eeuo pipefail
@@ -110,7 +111,9 @@ case "${1:-}" in
     echo ">>> lab is up"
     ;;
   check)
-    out="$(ansible-playbook playbook.yml 2>&1)"; rc=$?
+    # a failing substitution in an assignment exits under set -e before rc is read
+    rc=0
+    out="$(ansible-playbook playbook.yml 2>&1)" || rc=$?
     printf '%s\n' "$out" | grep -A6 '^PLAY RECAP'
     (( rc == 0 )) || exit "$rc"
     if printf '%s\n' "$out" | grep -A6 '^PLAY RECAP' | grep -qE 'changed=[1-9]'; then
@@ -127,7 +130,8 @@ case "${1:-}" in
     done
     python3 scripts/lib/status_check.py "$prom"
     ;;
+  versions) python3 scripts/lib/versions_resolved.py ;;
   down)  docker compose down ;;
   reset) docker compose down -v ;;
-  *) sed -n '2,7p' "$0"; exit 1 ;;
+  *) sed -n '2,8p' "$0"; exit 1 ;;
 esac

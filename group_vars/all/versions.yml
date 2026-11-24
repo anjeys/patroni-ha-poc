@@ -1,32 +1,34 @@
 ---
-# Every version in one place. Exact apt versions on purpose: PGDG keeps only the
-# latest build of each package, so a stale pin fails the run instead of silently
-# installing something else. A bump is a deliberate commit.
+# Every version in one place. An apt pin is a branch, not a build (ADR-0006): PGDG and
+# Ubuntu keep only the latest build of a package, so an exact pin fails the run the week
+# after a rebuild (drills run #17: 18.6-1.pgdg24.04+2 against 18.7-1.pgdg24.04+5). apt and
+# Ansible's apt module take the glob and install the branch's current build; a second run
+# changes nothing; `scripts/lab.sh versions` records the build that was installed into
+# evidence/ and fails on one outside its branch. A new branch is a deliberate commit.
 postgresql_version: 18
-postgresql_package_version: "18.6-1.pgdg24.04+2"
-patroni_version: "4.1.5-2.pgdg24.04+1"
-pgbackrest_version: "2.59.3-1.pgdg24.04+1"
-pgbouncer_version: "1.26.1-1.pgdg24.04+1"
-psycopg2_version: "2.9.10-1.pgdg24.04+1"
-haproxy_version: "2.8.16-0ubuntu0.24.04.3"
+postgresql_package_version: "18.*"
+patroni_version: "4.1.*"
+pgbackrest_version: "2.60.*"
+pgbouncer_version: "1.26.*"
+psycopg2_version: "2.9.*"
+haproxy_version: "2.8.*"
 # Ubuntu's build, like haproxy: upstream publishes source only, and a build
-# toolchain for a VRRP daemon buys nothing this lab uses.
-keepalived_version: "1:2.2.8-1build2"
+# toolchain for a VRRP daemon buys nothing this lab uses. The epoch is part of the pin.
+keepalived_version: "1:2.2.*"
 
 # The address applications connect to; keepalived keeps it on a live balancer.
 pg_access_vip: "172.{{ lab_net }}.0.100"
 
-# Monitoring, upstream release assets by SHA-256 (sha256sums.txt of the release).
-postgres_exporter_version: "0.20.1"
-postgres_exporter_sha256: "89d4f7e7920cad48fdc3133f789556ef5253c330a9f5fdace3bdb6344c0a8b5a"
-prometheus_version: "3.15.1"
-prometheus_sha256: "6a726885328ad9efebbf36e876ce2fb6225468a71fd1e7ce3ba666d5f4d97a84"
-
-# Upstream release asset, SHA-256 from its SHA256SUMS. Ubuntu's package is 3.4.
-etcd_version: "3.7.2"
-etcd_sha256: "3a3679bc51a4ee9d30bccea1da7cd4fe62c6fc1d2ca1255068d2c53bf3026135"
+# Release assets are exact: the version and the sha256 of its checksum file, bumped together.
+# Monitoring (sha256sums.txt of the release).
+postgres_exporter_version: "0.21.1"
+postgres_exporter_sha256: "02f316da4e9e409749d6f3b25102d3561cb408023110f3653f6514548926ff0c"
+prometheus_version: "3.16.0"
+prometheus_sha256: "68727009472a2c02e1ff7f062fd5b3e637285bffc8fc2d340c76fb449d6e0f34"
+# Upstream release asset, SHA-256 from its SHA256SUMS. Ubuntu's package is 3.4 (ADR-0001).
+etcd_version: "3.7.4"
+etcd_sha256: "a0d47d07d081c12611fe69dc81a16ae8dd758401c0fe3a83d508823a1dac558e"
 
 pgdg_key_fingerprint: "B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8"
-
 pg_data_dir: "/var/lib/postgresql/{{ postgresql_version }}/main"
 pg_bin_dir: "/usr/lib/postgresql/{{ postgresql_version }}/bin"

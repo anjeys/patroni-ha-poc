@@ -20,6 +20,10 @@ VIP="172.${LAB_NET}.0.100"
 SCOPE=patroni-cluster
 APP_PORT=6432          # PgBouncer on the VIP, which is how an application reaches the cluster
 PATRONI=(patronictl -c /etc/patroni/config.yml)
+# The PostgreSQL major lives in versions.yml, the one place for versions (ADR-0006).
+PG_MAJOR="$(awk '$1 == "postgresql_version:" { print $2 }' group_vars/all/versions.yml)"
+PG_DATA="/var/lib/postgresql/$PG_MAJOR/main"
+PG_BIN="/usr/lib/postgresql/$PG_MAJOR/bin"
 
 log()  { printf '\033[1;34m>>> %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33mWARN: %s\033[0m\n' "$*" >&2; }
@@ -48,7 +52,8 @@ app_sql() { # app_sql <sql>
 vip_holder() {
   local b
   for b in "${BALANCERS[@]}"; do
-    docker exec "$b" ip -4 -o addr show eth0 2>/dev/null | grep -q "$VIP/" && { echo "$b"; return 0; }
+    # grep -c, not -q: an early exit of grep under pipefail reads as "no holder"
+    [[ "$(docker exec "$b" ip -4 -o addr show eth0 2>/dev/null | grep -c "$VIP/")" != 0 ]] && { echo "$b"; return 0; }
   done
   return 1
 }
@@ -229,17 +234,17 @@ cmd_pitr() {
   # then is handed over as a healthy directory on a new timeline.
   log "finishing recovery with Patroni out of the way"
 
-  docker exec "$node" rm -f /var/lib/postgresql/18/main/standby.signal
+  docker exec "$node" rm -f $PG_DATA/standby.signal
 
   # pgBackRest wrote the recovery settings into postgresql.auto.conf; they are
   # intact as long as Patroni does not start. restore_command is what fetches
   # the segments the target needs but the restore did not place on disk.
-  docker exec "$node" bash -c "grep -q '^restore_command' /var/lib/postgresql/18/main/postgresql.auto.conf \
+  docker exec "$node" bash -c "grep -q '^restore_command' $PG_DATA/postgresql.auto.conf \
     || printf \"restore_command = 'pgbackrest --stanza=main archive-get %%f \\\"%%p\\\"'\\n\" \
-       >> /var/lib/postgresql/18/main/postgresql.auto.conf"
+       >> $PG_DATA/postgresql.auto.conf"
 
   docker exec -u postgres "$node" \
-    /usr/lib/postgresql/18/bin/pg_ctl -D /var/lib/postgresql/18/main \
+    $PG_BIN/pg_ctl -D $PG_DATA \
     -o "-c unix_socket_directories=/tmp -c port=5432" -w -t 120 start \
     || die "PostgreSQL did not start for recovery"
 
@@ -260,7 +265,7 @@ cmd_pitr() {
   if [[ "$(node_sql "$node" "select pg_is_in_recovery()")" == "t" ]]; then
     log "promoting the restored copy"
     docker exec -u postgres "$node" \
-      /usr/lib/postgresql/18/bin/pg_ctl -D /var/lib/postgresql/18/main promote \
+      $PG_BIN/pg_ctl -D $PG_DATA promote \
       || die "promote failed"
     for _ in $(seq 1 30); do
       [[ "$(node_sql "$node" "select pg_is_in_recovery()")" == "f" ]] && break
@@ -279,7 +284,7 @@ cmd_pitr() {
   # leader key and adopts what it finds instead of trying to catch up to it.
   log "handing the cluster back to Patroni"
   docker exec -u postgres "$node" \
-    /usr/lib/postgresql/18/bin/pg_ctl -D /var/lib/postgresql/18/main -w -t 60 stop >/dev/null
+    $PG_BIN/pg_ctl -D $PG_DATA -w -t 60 stop >/dev/null
 
   # The DCS still describes the cluster as it was before the restore: a leader
   # key, a timeline history and the members that followed them. Patroni reads
@@ -303,7 +308,7 @@ cmd_pitr() {
   # The other two nodes rebuild from the new timeline.
   for n in "${NODES[@]}"; do
     [[ "$n" == "$node" ]] && continue
-    docker exec "$n" rm -rf /var/lib/postgresql/18/main
+    docker exec "$n" rm -rf $PG_DATA
     docker exec "$n" systemctl start patroni
   done
   log "replicas are rebuilding from the restored primary"

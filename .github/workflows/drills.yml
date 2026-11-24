@@ -53,6 +53,7 @@ jobs:
           scripts/lab.sh up
           scripts/lab.sh check
           scripts/lab.sh status
+          scripts/lab.sh versions
 
       - name: Cluster state before the drills
         run: |
