@@ -5,7 +5,7 @@
 #   scripts/drill.sh pitr       lose a table, restore to the second before it
 #   scripts/drill.sh access     kill the balancer holding the VIP, time the takeover
 #
-# Both write a marker first and verify it afterwards: a cluster that comes back
+# Each writes a marker first and verifies it afterwards: a cluster that comes back
 # without the last committed row has not recovered, it has restarted.
 # Evidence lands in evidence/<drill>-<utc>.json.
 set -Eeuo pipefail
