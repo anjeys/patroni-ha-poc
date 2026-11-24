@@ -21,9 +21,8 @@ updates:
       interval: weekly
       day: monday
     # the base image is the Ubuntu LTS the PGDG repository (noble-pgdg) is built for: a new
-    # major is a decision and a new repository line, not a weekly bump (PR #10 bumped to 26.04)
-    # (PR #10 bumped to 26.04, PR #12 to 24.10 - a non-LTS PGDG has no line for): every
-    # ubuntu update is a decision; the digest moves with a deliberate commit
+    # major is a decision and a new repository line, not a weekly bump (PR #10 bumped to 26.04,
+    # PR #12 to 24.10 - a non-LTS PGDG has no line for); the digest moves with a deliberate commit
     ignore:
       - dependency-name: ubuntu
   - package-ecosystem: pip

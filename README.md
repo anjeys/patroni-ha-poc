@@ -10,8 +10,9 @@ replication and point-in-time recovery, deployed by Ansible onto systemd
 containers that stand in for bare metal.
 
 Every claim below is a number a script produced, not a description of what the
-components are supposed to do. The two drills kill the leader and destroy a
-table, then check that the last committed row is still there.
+components are supposed to do. The three drills kill the leader, kill the access
+node that holds the address and drop a table, then check that the last committed
+row is still there.
 
 ## What it runs
 
@@ -25,7 +26,7 @@ table, then check that the last committed row is still there.
 | keepalived | 2.2.* | one virtual address over two access nodes |
 | PgBouncer | 1.26.* | transaction pooling on 6432 |
 | postgres_exporter / Prometheus | 0.21.1 / 3.16.0 | metrics and six alerting rules on the repository host |
-| Ansible | 2.17+ | deployment; `scripts/lab.sh` wraps it |
+| Ansible | 2.20.3 on the laptop, 2.22.0 in CI (`requirements-ci.txt`) | deployment; `scripts/lab.sh` wraps it |
 
 Apt pins in `group_vars/all/versions.yml` name a branch (`18.*`, `4.1.*`): PGDG and
 Ubuntu keep only the latest build of each package, and an exact pin turned the weekly
@@ -38,7 +39,7 @@ with a SHA-256 the playbook verifies.
 
 | Claim | How it is proved | Result |
 |---|---|---|
-| A killed leader is replaced without losing a committed row | `scripts/drill.sh failover` | new leader in 21-25 s, writes accepted in 23-40 s, marker intact |
+| A killed leader is replaced without losing a committed row | `scripts/drill.sh failover` | new leader in 21-27 s, writes accepted in 22-37 s, marker intact |
 | A killed access node is replaced behind the same address | `scripts/drill.sh access` | VIP moved in 4 s, writes accepted in 4 s, marker intact; the database cluster is not touched |
 | A dropped table can be recovered to the second before it was dropped | `scripts/drill.sh pitr` | marker restored, cluster back under Patroni, both replicas streaming |
 | A commit is on a replica before it is acknowledged | `synchronous_mode: true`, `maximum_lag_on_failover: 0`; the failover drill reads the marker from the promoted node | passes |
@@ -65,8 +66,8 @@ is committed in [`docs/evidence/`](docs/evidence/) by the evidence bot after eve
 `scripts/drill.sh failover` writes a row through PgBouncer, kills the leader
 with `SIGKILL`, and times two things:
 
-- **21-25 s** until the cluster agrees on a new leader
-- **23-40 s** until an application can write again on port 6432
+- **21-27 s** until the cluster agrees on a new leader
+- **22-37 s** until an application can write again on port 6432
 
 `SIGKILL` rather than `docker stop` on purpose: a process allowed to shut down
 cleanly hands over the leader key, and timing that measures a switchover, which
@@ -118,10 +119,10 @@ costs.
     scripts/lab.sh down      # stop, keep the volumes
     scripts/lab.sh reset     # stop and drop the volumes
 
-`lab.sh up` generates an SSH key pair and three passwords on first run.
-Nothing is committed: `group_vars/all/secrets.yml` and `.ssh/` are gitignored,
-and `secrets.yml.example` shows the shape. On real hosts the file is
-`ansible-vault` encrypted.
+`lab.sh up` generates two SSH key pairs (the control node's, the pgBackRest mesh's), the lab CA
+with a certificate per host and 8 secrets on first run. Nothing is committed:
+`group_vars/all/secrets.yml`, `.ssh/` and `.pki/` are gitignored; `secrets.yml.example` shows the
+shape. The secrets file is `ansible-vault` encrypted, here and on real hosts.
 
 Check the cluster:
 
@@ -153,10 +154,27 @@ hosts the organisation's CA issues the same certificates. Client certificates (m
 PostgreSQL) are not issued: passwords over verified TLS (ADR-0009, ADR-0010). The passphrase
 of the backup repository is one more generated secret: a lost `.pki/` or secrets file is a reset.
 
+**Secrets rest on the hosts in files.** Patroni's configuration, the exporter's unit, PgBouncer's
+`userlist.txt` and the repository's configuration carry their passwords in clear text, readable by
+the service's user only (mode 0600); the vault protects them on the control node, nothing does on
+the hosts. A secret manager is a site's choice, not this lab's.
+
+**Host keys are not checked.** `ansible.cfg` and the pgBackRest mesh both set
+`StrictHostKeyChecking no`: every rebuild mints new host keys on the same addresses. A real
+inventory manages `known_hosts`; the lab network is private, and this is where it shows.
+
+**Read endpoints trust the network.** The CA proves the server to the client, not the client to
+the server: `/health`, `/metrics` and the stats page answer anyone on the lab network who verifies
+the certificate (ADR-0010). The REST API's write endpoints keep their password.
+
+**The evidence bot holds a write key to `main`.** The deploy key is the ruleset's bypass actor
+(ADR-0008): whoever reads the repository's secrets can push to `main` - the same people who can
+change the workflows.
+
 **Alerts go nowhere.** Six rules evaluate and `lab.sh status` asserts them;
 routing them through Alertmanager and drawing them in Grafana is site-specific.
 
-**Numbers come from one laptop and one hosted runner.** 21-25 s is what this network and these disks
+**Numbers come from one laptop and one hosted runner.** 21-27 s is what this network and these disks
 give; the shape of the measurement transfers, the value does not.
 
 **The cluster is idle when it is measured.** The drills write one row and
@@ -172,7 +190,9 @@ fires when it does not.
 
 **Drills run weekly and on pull requests that touch the cluster, not on every push.**
 `.github/workflows/drills.yml` builds the cluster on a GitHub-hosted runner and runs all three
-drills; evidence is attached to the run. A pull request that changes only prose pays for lint.
+drills; evidence is attached to the run. A pull request that changes only prose pays for lint; the
+drills job answers on it too, green without a cluster - a required check that never ran blocks the
+merge (ADR-0007).
 The pipeline itself - six lint jobs, the bots, the branch ruleset, Scorecard - is ADR-0007.
 
 ## Decisions
@@ -187,3 +207,4 @@ The pipeline itself - six lint jobs, the bots, the branch ruleset, Scorecard - i
 - [ADR-0008](docs/adr/0008-bots.md) - the lab's own bots: the evidence snapshot, the pins watch, the release
 - [ADR-0009](docs/adr/0009-pki.md) - the lab's own PKI: etcd over TLS with authentication, PostgreSQL verified by a CA
 - [ADR-0010](docs/adr/0010-periphery-pki.md) - the periphery on the PKI: the REST API, the monitoring, the backup repository
+- [ADR-0011](docs/adr/0011-what-stays-outside.md) - the lab closed at v2.0: what stays outside, and why

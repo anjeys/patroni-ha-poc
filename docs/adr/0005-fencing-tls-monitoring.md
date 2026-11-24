@@ -1,6 +1,6 @@
 # ADR-0005: watchdog fencing, TLS to PostgreSQL, monitoring with alerts
 
-- Status: accepted
+- Status: accepted; the TLS section superseded by ADR-0009 and ADR-0010
 - Date: 2026-10-24
 
 ## Watchdog
@@ -24,6 +24,9 @@ reboot is the fence. All three containers see the host's one device; only the
 leader opens it, which is exactly the contract.
 
 ## TLS
+
+*Superseded: ADR-0009 made the lab CA and put etcd on TLS with authentication, ADR-0010 the
+rest. What follows is the record of the self-signed stage.*
 
 PostgreSQL accepts TCP connections over TLS only: every `pg_hba` rule that is
 not the local socket is `hostssl`, which covers replication, PgBouncer's
