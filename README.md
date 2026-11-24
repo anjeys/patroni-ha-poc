@@ -46,6 +46,7 @@ with a SHA-256 the playbook verifies.
 | Running the playbook twice changes nothing | `scripts/lab.sh check` | `changed=0` |
 | A killed leader is fenced by the kernel watchdog, and the new leader arms it | `scripts/drill.sh failover`, watchdog section of the evidence | fired 17-19 s after the kill, 1-3 s before the leader key would have expired (`ttl: 20`, `safety_margin: 3`); `/dev/watchdog` held by the new leader |
 | PostgreSQL refuses a connection that is not TLS | `psql "sslmode=disable"` against 5000 | `no pg_hba.conf entry`; replication and the pooler connect with `ssl = t` |
+| Every server certificate is the lab CA's and clients verify it | the drills connect to the VIP with `sslmode=verify-full`; etcd refuses a client without the CA or the password | passes |
 | Every monitoring target is up, every rule loaded, nothing firing | `scripts/lab.sh status` | passes |
 | Every installed build is inside its pinned branch, and which one is recorded | `scripts/lab.sh versions` | `evidence/versions-*.json`, `every_build_in_its_branch: true` |
 
@@ -146,9 +147,10 @@ the kernel log line the suppressed reboot leaves behind; a real host leaves
 `soft_noboot` at 0 and the reboot is the fence. A host without softdog runs
 with the watchdog off and the evidence says so.
 
-**etcd is plain HTTP without authentication, and there is no CA.** PostgreSQL
-TLS is self-signed per node, so `sslmode=require` rather than `verify-full`.
-Client-to-PgBouncer TLS and an etcd PKI are named in ADR-0005 as the next step.
+**The CA is the lab's.** `scripts/lab.sh pki` makes it into `.pki/` (gitignored); on real
+hosts the organisation's CA issues the same certificates. Client certificates (mTLS to
+PostgreSQL) are not issued: passwords over verified TLS (ADR-0009). Patroni's REST API, the
+monitoring endpoints and the backup repository are still as ADR-0005 left them.
 
 **Alerts go nowhere.** Six rules evaluate and `lab.sh status` asserts them;
 routing them through Alertmanager and drawing them in Grafana is site-specific.
@@ -182,3 +184,4 @@ The pipeline itself - six lint jobs, the bots, the branch ruleset, Scorecard - i
 - [ADR-0006](docs/adr/0006-branch-pins.md) - a package pin is a branch; the build is read at install time and recorded
 - [ADR-0007](docs/adr/0007-ci-cd.md) - the pipeline of a public repository: every check, every bot, the branch protected
 - [ADR-0008](docs/adr/0008-bots.md) - the lab's own bots: the evidence snapshot, the pins watch, the release
+- [ADR-0009](docs/adr/0009-pki.md) - the lab's own PKI: etcd over TLS with authentication, PostgreSQL verified by a CA
