@@ -1,0 +1,74 @@
+{
+  "schema": "patroni.versions.v1",
+  "created_at": "2026-11-24T16:07:55+00:00",
+  "pins": {
+    "postgresql_version": 18,
+    "postgresql_package_version": "18.*",
+    "patroni_version": "4.1.*",
+    "pgbackrest_version": "2.60.*",
+    "pgbouncer_version": "1.26.*",
+    "psycopg2_version": "2.9.*",
+    "haproxy_version": "2.8.*",
+    "keepalived_version": "1:2.2.*",
+    "postgres_exporter_version": "0.21.1",
+    "prometheus_version": "3.16.0",
+    "etcd_version": "3.7.4"
+  },
+  "resolved": {
+    "postgresql-18": {
+      "node1": "18.7-1.pgdg24.04+5",
+      "node2": "18.7-1.pgdg24.04+5",
+      "node3": "18.7-1.pgdg24.04+5"
+    },
+    "postgresql-client-18": {
+      "node1": "18.7-1.pgdg24.04+5",
+      "node2": "18.7-1.pgdg24.04+5",
+      "node3": "18.7-1.pgdg24.04+5",
+      "balancer": "18.7-1.pgdg24.04+5",
+      "balancer2": "18.7-1.pgdg24.04+5",
+      "backup": "18.7-1.pgdg24.04+5"
+    },
+    "patroni": {
+      "node1": "4.1.5-2.pgdg24.04+1",
+      "node2": "4.1.5-2.pgdg24.04+1",
+      "node3": "4.1.5-2.pgdg24.04+1"
+    },
+    "pgbackrest": {
+      "node1": "2.60.1-1.pgdg24.04+1",
+      "node2": "2.60.1-1.pgdg24.04+1",
+      "node3": "2.60.1-1.pgdg24.04+1",
+      "backup": "2.60.1-1.pgdg24.04+1"
+    },
+    "python3-psycopg2": {
+      "node1": "2.9.10-1.pgdg24.04+1",
+      "node2": "2.9.10-1.pgdg24.04+1",
+      "node3": "2.9.10-1.pgdg24.04+1"
+    },
+    "pgbouncer": {
+      "balancer": "1.26.1-1.pgdg24.04+1",
+      "balancer2": "1.26.1-1.pgdg24.04+1"
+    },
+    "haproxy": {
+      "balancer": "2.8.30-0ubuntu0.24.04.2",
+      "balancer2": "2.8.30-0ubuntu0.24.04.2"
+    },
+    "keepalived": {
+      "balancer": "1:2.2.8-1build2",
+      "balancer2": "1:2.2.8-1build2"
+    },
+    "etcd": {
+      "node1": "etcd Version: 3.7.4",
+      "node2": "etcd Version: 3.7.4",
+      "node3": "etcd Version: 3.7.4"
+    },
+    "postgres_exporter": {
+      "node1": "postgres_exporter, version 0.21.1 (branch: HEAD, revision: 05ec47a115a2c5d813e64c664213a88682fc8dc7)",
+      "node2": "postgres_exporter, version 0.21.1 (branch: HEAD, revision: 05ec47a115a2c5d813e64c664213a88682fc8dc7)",
+      "node3": "postgres_exporter, version 0.21.1 (branch: HEAD, revision: 05ec47a115a2c5d813e64c664213a88682fc8dc7)"
+    },
+    "prometheus": {
+      "backup": "prometheus, version 3.16.0 (branch: HEAD, revision: e2e28adeee2c5883d000fc82aca6008cfbf7e96d)"
+    }
+  },
+  "every_build_in_its_branch": true
+}

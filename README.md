@@ -36,13 +36,13 @@ with a SHA-256 the playbook verifies.
 
 | Claim | How it is proved | Result |
 |---|---|---|
-| A killed leader is replaced without losing a committed row | `scripts/drill.sh failover` | new leader in 21-27 s, writes accepted in 24-36 s, marker intact |
+| A killed leader is replaced without losing a committed row | `scripts/drill.sh failover` | new leader in 21-27 s, writes accepted in 23-40 s, marker intact |
 | A killed access node is replaced behind the same address | `scripts/drill.sh access` | VIP moved in 4 s, writes accepted in 4 s, marker intact; the database cluster is not touched |
 | A dropped table can be recovered to the second before it was dropped | `scripts/drill.sh pitr` | marker restored, cluster back under Patroni, both replicas streaming |
 | A commit is on a replica before it is acknowledged | `synchronous_mode: true`, `maximum_lag_on_failover: 0`; the failover drill reads the marker from the promoted node | passes |
 | WAL reaches the repository continuously | `pgbackrest --stanza=main check`, `pg_stat_archiver` | `failed_count = 0` |
 | Running the playbook twice changes nothing | `scripts/lab.sh check` | `changed=0` |
-| A killed leader is fenced by the kernel watchdog, and the new leader arms it | `scripts/drill.sh failover`, watchdog section of the evidence | fired 17 s after the kill, 3 s before the leader key would have expired (`ttl: 20`, `safety_margin: 3`); `/dev/watchdog` held by the new leader |
+| A killed leader is fenced by the kernel watchdog, and the new leader arms it | `scripts/drill.sh failover`, watchdog section of the evidence | fired 17-24 s after the kill, -4-3 s before the leader key would have expired (`ttl: 20`, `safety_margin: 3`); `/dev/watchdog` held by the new leader |
 | PostgreSQL refuses a connection that is not TLS | `psql "sslmode=disable"` against 5000 | `no pg_hba.conf entry`; replication and the pooler connect with `ssl = t` |
 | Every monitoring target is up, every rule loaded, nothing firing | `scripts/lab.sh status` | passes |
 | Every installed build is inside its pinned branch, and which one is recorded | `scripts/lab.sh versions` | `evidence/versions-*.json`, `every_build_in_its_branch: true` |
@@ -51,7 +51,7 @@ Drill output lands in `evidence/` as JSON: the method, the intervals, the
 marker, and whether it survived.
 The same drills run weekly in CI (`drills` workflow); each run uploads its
 `evidence/` as an artifact.
-A snapshot from CI run [40106965093](https://github.com/anjeys/patroni-ha-poc/actions/runs/40106965093) is committed in [`docs/evidence/`](docs/evidence/).
+A snapshot from CI run [45432641291](https://github.com/anjeys/patroni-ha-poc/actions/runs/45432641291) is committed in [`docs/evidence/`](docs/evidence/).
 
 ## Failover, measured
 
@@ -59,7 +59,7 @@ A snapshot from CI run [40106965093](https://github.com/anjeys/patroni-ha-poc/ac
 with `SIGKILL`, and times two things:
 
 - **21-27 s** until the cluster agrees on a new leader
-- **24-36 s** until an application can write again on port 6432
+- **23-40 s** until an application can write again on port 6432
 
 `SIGKILL` rather than `docker stop` on purpose: a process allowed to shut down
 cleanly hands over the leader key, and timing that measures a switchover, which
