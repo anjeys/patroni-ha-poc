@@ -2,6 +2,8 @@
 
 [![lint](https://github.com/anjeys/patroni-ha-poc/actions/workflows/lint.yml/badge.svg)](https://github.com/anjeys/patroni-ha-poc/actions/workflows/lint.yml)
 [![drills](https://github.com/anjeys/patroni-ha-poc/actions/workflows/drills.yml/badge.svg)](https://github.com/anjeys/patroni-ha-poc/actions/workflows/drills.yml)
+[![security](https://github.com/anjeys/patroni-ha-poc/actions/workflows/security.yml/badge.svg)](https://github.com/anjeys/patroni-ha-poc/actions/workflows/security.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/anjeys/patroni-ha-poc/badge)](https://scorecard.dev/viewer/?uri=github.com/anjeys/patroni-ha-poc)
 
 A three-node PostgreSQL cluster with automatic failover, synchronous
 replication and point-in-time recovery, deployed by Ansible onto systemd
@@ -49,9 +51,11 @@ with a SHA-256 the playbook verifies.
 
 Drill output lands in `evidence/` as JSON: the method, the intervals, the
 marker, and whether it survived.
-The same drills run weekly in CI (`drills` workflow); each run uploads its
-`evidence/` as an artifact.
-A snapshot from CI run [45432641291](https://github.com/anjeys/patroni-ha-poc/actions/runs/45432641291) is committed in [`docs/evidence/`](docs/evidence/).
+The same drills run weekly in CI (`drills` workflow) and on every pull request that touches
+the cluster's code; each run uploads its `evidence/` as an artifact and prints the table in
+its summary.
+A snapshot from CI run [45432641291](https://github.com/anjeys/patroni-ha-poc/actions/runs/45432641291)
+is committed in [`docs/evidence/`](docs/evidence/).
 
 ## Failover, measured
 
@@ -162,10 +166,10 @@ alone rather than stop accepting writes, and the zero-data-loss claim holds
 only while a synchronous standby exists. The `NoSynchronousStandby` alert
 fires when it does not.
 
-**Drills run weekly, not on every push.** `.github/workflows/drills.yml`
-builds the cluster on a GitHub-hosted runner and runs all three drills;
-evidence is attached to the run. Ten minutes of systemd containers per run
-is a weekly cost, not a per-commit one; lint runs on every push.
+**Drills run weekly and on pull requests that touch the cluster, not on every push.**
+`.github/workflows/drills.yml` builds the cluster on a GitHub-hosted runner and runs all three
+drills; evidence is attached to the run. A pull request that changes only prose pays for lint.
+The pipeline itself - six lint jobs, the bots, the branch ruleset, Scorecard - is ADR-0007.
 
 ## Decisions
 
@@ -175,3 +179,4 @@ is a weekly cost, not a per-commit one; lint runs on every push.
 - [ADR-0004](docs/adr/0004-vip-and-backup-host.md) - two access nodes behind a VIP; the repository on its own host
 - [ADR-0005](docs/adr/0005-fencing-tls-monitoring.md) - watchdog fencing, TLS to PostgreSQL, monitoring with alerts
 - [ADR-0006](docs/adr/0006-branch-pins.md) - a package pin is a branch; the build is read at install time and recorded
+- [ADR-0007](docs/adr/0007-ci-cd.md) - the pipeline of a public repository: every check, every bot, the branch protected
