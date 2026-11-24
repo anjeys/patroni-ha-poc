@@ -191,8 +191,8 @@ fires when it does not.
 **Drills run weekly and on pull requests that touch the cluster, not on every push.**
 `.github/workflows/drills.yml` builds the cluster on a GitHub-hosted runner and runs all three
 drills; evidence is attached to the run. A pull request that changes only prose pays for lint; the
-drills job answers on it too, green without a cluster - a required check that never ran blocks the
-merge (ADR-0007).
+drills job answers on it too, green without a cluster in 17 s (PR #19; a full run on the runner takes
+7 min 18 s, PR #18) - a required check that never ran blocks the merge (ADR-0007).
 The pipeline itself - six lint jobs, the bots, the branch ruleset, Scorecard - is ADR-0007.
 
 ## Decisions
