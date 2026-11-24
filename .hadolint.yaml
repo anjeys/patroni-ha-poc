@@ -1,0 +1,6 @@
+---
+# DL3008 wants every apt package pinned to a build. The image's packages (systemd, sshd, python)
+# ride Ubuntu's own branch on purpose: a build pin here would break the week after a security
+# rebuild, the way the PGDG pins did (ADR-0006). The base image itself is pinned by digest.
+ignored:
+  - DL3008

@@ -1,0 +1,22 @@
+---
+# The bots (ADR-0007). Dependabot moves every action's commit sha and the tag beside it, the
+# base image's digest in the Dockerfile and the pinned python tools of requirements-ci.txt;
+# each as a pull request the lint workflow checks. Apt pins are branches (ADR-0006) and need
+# no bot. Renovate would do the same with grouping and is the recorded alternative.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
