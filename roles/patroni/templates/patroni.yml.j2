@@ -5,10 +5,19 @@ name: "{{ inventory_hostname }}"
 restapi:
   listen: "0.0.0.0:8008"
   connect_address: "{{ ansible_host }}:8008"
+  # TLS with the node's certificate from the lab CA (ADR-0010): HAProxy's health checks and
+  # Prometheus verify it; the other members verify it through ctl.cacert below.
+  certfile: /etc/patroni/server.crt
+  keyfile: /etc/patroni/server.key
+  cafile: /etc/patroni/ca.crt
   # Health endpoints stay open for HAProxy; failover, restart and reload do not.
   authentication:
     username: patroni
     password: "{{ patroni_restapi_password }}"
+
+# What patronictl and Patroni's own requests to the other members verify the REST API with.
+ctl:
+  cacert: /etc/patroni/ca.crt
 
 # v3 API against every member over TLS from the lab CA, as the patroni user (ADR-0009): a dead
 # local etcd must not demote a healthy leader, and v2 is gone from etcd >= 3.6.

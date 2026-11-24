@@ -105,7 +105,7 @@ pki() {
 # the only clear-text secret on the control node and is gitignored too.
 SECRETS=group_vars/all/secrets.yml
 SECRET_KEYS=(pg_superuser_password pg_replication_password patroni_restapi_password pgbouncer_auth_password
-             etcd_root_password etcd_patroni_password)
+             etcd_root_password etcd_patroni_password pg_exporter_password pgbackrest_cipher_pass)
 
 # ansible.cfg names the vault password file, so vault commands need no flag
 # (a flag on top of it creates two "default" vault ids and encrypt refuses).
@@ -152,12 +152,13 @@ case "${1:-}" in
     ;;
   status)
     # Everything the monitoring stack asserts about the running cluster.
-    prom="http://172.$LAB_NET.0.7:9090"
+    # Prometheus serves TLS with the repository host's certificate: verified against the lab CA
+    prom="https://172.$LAB_NET.0.7:9090"
     for _ in $(seq 1 24); do
-      curl -fsS --max-time 3 "$prom/-/ready" >/dev/null 2>&1 && break
+      curl -fsS --max-time 3 --cacert .pki/ca.crt "$prom/-/ready" >/dev/null 2>&1 && break
       sleep 5
     done
-    python3 scripts/lib/status_check.py "$prom"
+    python3 scripts/lib/status_check.py "$prom" .pki/ca.crt
     ;;
   versions) python3 scripts/lib/versions_resolved.py ;;
   down)  docker compose down ;;

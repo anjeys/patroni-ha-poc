@@ -1,10 +1,12 @@
-import json, sys, time, urllib.request as u
+import json, ssl, sys, time, urllib.request as u
 
-base = sys.argv[1]
+base, cafile = sys.argv[1], sys.argv[2]
+# Prometheus serves TLS from the lab CA (ADR-0010): verified, never skipped.
+ctx = ssl.create_default_context(cafile=cafile)
 
 
 def get(path):
-    return json.load(u.urlopen(base + path, timeout=10))["data"]
+    return json.load(u.urlopen(base + path, timeout=10, context=ctx))["data"]
 
 
 # A rule over a metric nobody exports never fires: assert the series too.

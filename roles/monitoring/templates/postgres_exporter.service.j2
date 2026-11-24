@@ -4,9 +4,11 @@ After=network-online.target
 
 [Service]
 User=postgres
-Environment=DATA_SOURCE_URI=/postgres?host=/tmp&sslmode=disable
-Environment=DATA_SOURCE_USER=postgres
-ExecStart=/usr/local/bin/postgres_exporter --web.listen-address=:9187 --collector.stat_archiver
+Environment=DATA_SOURCE_URI=127.0.0.1:5432/postgres?sslmode=verify-full&sslrootcert=/etc/patroni/ca.crt
+Environment=DATA_SOURCE_USER=postgres_exporter
+Environment=DATA_SOURCE_PASS={{ pg_exporter_password }}
+ExecStart=/usr/local/bin/postgres_exporter --web.listen-address=:9187 \
+  --web.config.file=/etc/postgres_exporter/web.yml --collector.stat_archiver
 Restart=always
 RestartSec=5
 

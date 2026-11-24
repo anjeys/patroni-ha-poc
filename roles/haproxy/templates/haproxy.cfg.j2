@@ -10,23 +10,26 @@ defaults
     timeout server 30m
     timeout check 5s
 
-# Metrics and the stats page on 8404: the built-in exporter, no sidecar.
+# Metrics and the stats page on 8404 over TLS with the balancer's certificate: the built-in
+# exporter, no sidecar; Prometheus verifies it against the lab CA (ADR-0010).
 frontend stats
-    bind *:8404
+    bind *:8404 ssl crt /etc/haproxy/server.pem
     mode http
     http-request use-service prometheus-exporter if { path /metrics }
     stats enable
     stats uri /stats
     stats refresh 10s
 
+# The health checks ask Patroni's REST API over TLS and verify its certificate against the lab CA
+# (the chain, not the name: HAProxy addresses the nodes by address). 5000 is the primary, 5001 the
+# replicas.
 listen master
     bind *:5000
     option httpchk OPTIONS /primary
     http-check expect status 200
     default-server inter 1s fall 2 rise 2 on-marked-down shutdown-sessions
-
     {% for host in groups['etcd_nodes'] %}
-    server {{ host }} {{ hostvars[host]['ansible_host'] }}:5432 maxconn 100 check port 8008
+    server {{ host }} {{ hostvars[host]['ansible_host'] }}:5432 maxconn 100 check port 8008 check-ssl ca-file /etc/haproxy/ca.crt verify required
     {% endfor %}
 
 listen replicas
@@ -34,7 +37,6 @@ listen replicas
     option httpchk OPTIONS /replica
     http-check expect status 200
     default-server inter 1s fall 2 rise 2 on-marked-down shutdown-sessions
-
     {% for host in groups['etcd_nodes'] %}
-    server {{ host }} {{ hostvars[host]['ansible_host'] }}:5432 maxconn 100 check port 8008
+    server {{ host }} {{ hostvars[host]['ansible_host'] }}:5432 maxconn 100 check port 8008 check-ssl ca-file /etc/haproxy/ca.crt verify required
     {% endfor %}

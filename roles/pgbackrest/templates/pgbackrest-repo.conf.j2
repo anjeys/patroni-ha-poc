@@ -1,5 +1,10 @@
 [global]
 repo1-path=/var/lib/pgbackrest
+# The repository is encrypted client-side by pgBackRest with a passphrase from the secrets
+# (ADR-0010): a copy of the archive without the passphrase is noise. A repository made
+# without a cipher cannot be switched - a reset makes a new one.
+repo1-cipher-type=aes-256-cbc
+repo1-cipher-pass={{ pgbackrest_cipher_pass }}
 repo1-retention-full=2
 repo1-retention-archive=2
 process-max=2
