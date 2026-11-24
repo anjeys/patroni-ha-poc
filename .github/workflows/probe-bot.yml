@@ -1,0 +1,26 @@
+---
+name: probe-bot
+"on":
+  push:
+    branches: [probe/004-bot]
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  pr:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: A docs-only pull request from GITHUB_TOKEN
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name probe-bot
+          git config user.email probe-bot@users.noreply.github.com
+          git checkout -b probe/004-bot-pr
+          printf '\nprobe 004: a line a bot added\n' >> docs/adr/0007-ci-cd.md
+          git commit -am "probe: a docs-only change by a workflow"
+          git push origin probe/004-bot-pr
+          gh pr create --base main --head probe/004-bot-pr --title "probe: docs-only PR from GITHUB_TOKEN" --body "004b-probe: do checks run?"
