@@ -1,0 +1,11 @@
+---
+# Prose wraps at 120; tables and code are as wide as they need to be; MD060 (a table style
+# introduced after the tables were written) is off. Everything else is the default.
+config:
+  MD013:
+    line_length: 120
+    tables: false
+    code_blocks: false
+  MD060: false
+ignores:
+  - ".ansible/**"

@@ -1,34 +1,34 @@
 ---
-# Everything that can be checked without a cluster. The drills need systemd
-# containers and a few minutes each; they run by hand and write evidence, and
-# the README says so rather than pretending CI covers them.
+# Everything that can be checked without a cluster, on every push to main and every pull request:
+# the Ansible code, the shell, the workflows, the Dockerfile, the prose, the secrets. One tool per
+# job; each job is a required status check of the main branch's ruleset (ADR-0007). Every action is
+# pinned by its commit sha with the release tag beside it, and Dependabot moves both; harden-runner
+# audits the runner's egress on every job; the python tools come pinned from requirements-ci.txt.
 name: lint
-
 "on":
   push:
-    branches: [master, main]
+    branches: [main]
   pull_request:
-
 permissions:
   contents: read
-
 jobs:
   ansible:
     name: ansible-lint and yamllint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      - uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c  # v2.23.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
-          python-version: "3.12"
-
-      - name: Install
-        run: pip install ansible-core ansible-lint yamllint
-
+          python-version: "3.13"
+          cache: pip
+      - name: Install the pinned tools
+        run: pip install -r requirements-ci.txt
       # A playbook that cannot be parsed is a playbook that cannot run, and the
       # inventory names hosts this syntax check needs to resolve.
       # ansible.cfg names .vault_pass; no encrypted file is in the repository,
@@ -36,42 +36,81 @@ jobs:
       - name: Vault password placeholder and a rendered inventory
         run: |
           echo ci > .vault_pass
-          sed 's/@NET@/18/g' inventory.ini.tpl > inventory.ini
-
+          sed -e 's/@NET@/18/g' -e 's/@WATCHDOG@/0/g' inventory.ini.tpl > inventory.ini
       - name: Syntax
         run: ansible-playbook playbook.yml --syntax-check
-
       - name: ansible-lint
         run: ansible-lint
-
       - name: yamllint
         run: yamllint .
-
   shell:
     name: shellcheck
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
+      - uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c  # v2.23.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-
       - name: Syntax and shellcheck
         run: |
           set -euo pipefail
           for f in scripts/*.sh; do bash -n "$f"; done
           shellcheck --severity=warning scripts/*.sh
-
+  actions:
+    name: actionlint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c  # v2.23.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7  # v2.2.0
+  dockerfile:
+    name: hadolint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c  # v2.23.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387  # v3.5.0
+        with:
+          dockerfile: Dockerfile
+  prose:
+    name: markdownlint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c  # v2.23.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: DavidAnson/markdownlint-cli2-action@3ce8f712b5d8f31acd8e201be6d97e3d2bb23eb7  # v25.1.0
+        with:
+          globs: "**/*.md"
   secrets:
     name: gitleaks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      - uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c  # v2.23.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-
       # Passwords are generated per lab and gitignored, but a scan is the only
       # thing that proves it stayed that way.
       - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e  # v3.0.0

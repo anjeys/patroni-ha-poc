@@ -1,0 +1,5 @@
+# The python tools the workflows install, pinned (PyPI latest, 003a-probe); Dependabot moves them.
+# ansible-core 2.22 wants python >= 3.13: the workflows set it up.
+ansible-core==2.22.0
+ansible-lint==26.11.0
+yamllint==1.38.0
