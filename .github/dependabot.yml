@@ -10,6 +10,11 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    # v2.6.0 has no container image on ghcr (manifest unknown): the security
+    # workflow would go red on main, and it does not run on a pull request (PR #13)
+    ignore:
+      - dependency-name: ossf/scorecard-action
+        versions: ["2.6.0"]
   - package-ecosystem: docker
     directory: /
     schedule:
@@ -17,9 +22,10 @@ updates:
       day: monday
     # the base image is the Ubuntu LTS the PGDG repository (noble-pgdg) is built for: a new
     # major is a decision and a new repository line, not a weekly bump (PR #10 bumped to 26.04)
+    # (PR #10 bumped to 26.04, PR #12 to 24.10 - a non-LTS PGDG has no line for): every
+    # ubuntu update is a decision; the digest moves with a deliberate commit
     ignore:
       - dependency-name: ubuntu
-        update-types: ["version-update:semver-major"]
   - package-ecosystem: pip
     directory: /
     schedule:
