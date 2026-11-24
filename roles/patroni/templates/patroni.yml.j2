@@ -10,9 +10,13 @@ restapi:
     username: patroni
     password: "{{ patroni_restapi_password }}"
 
-# v3 API against every member: a dead local etcd must not demote a healthy
-# leader, and v2 is gone from etcd >= 3.6.
+# v3 API against every member over TLS from the lab CA, as the patroni user (ADR-0009): a dead
+# local etcd must not demote a healthy leader, and v2 is gone from etcd >= 3.6.
 etcd3:
+  protocol: https
+  cacert: /etc/patroni/ca.crt
+  username: patroni
+  password: "{{ etcd_patroni_password }}"
   hosts:
 {% for host in groups['etcd_nodes'] %}
     - "{{ hostvars[host]['ansible_host'] }}:2379"
@@ -69,21 +73,28 @@ postgresql:
   bin_dir: "{{ pg_bin_dir }}"
   pgpass: "/tmp/pgpass"
   authentication:
+    # a replica verifies the primary's certificate against the lab CA: encryption and identity
     replication:
       username: replicator
       password: "{{ pg_replication_password }}"
+      sslmode: verify-full
+      sslrootcert: /etc/patroni/ca.crt
     superuser:
       username: postgres
       password: "{{ pg_superuser_password }}"
   pg_hba:
     - local   all             all                                     peer
     - hostssl all             all             127.0.0.1/32            scram-sha-256
+    # Patroni's own replication connection (timeline, lsn) is localhost TCP once the replication
+    # auth carries sslmode (005l-fix): without this line every replica fails it ~4 times a second
+    - hostssl replication     replicator      127.0.0.1/32            scram-sha-256
     - hostssl all             all             172.{{ lab_net }}.0.0/16           scram-sha-256
     - hostssl replication     replicator      172.{{ lab_net }}.0.0/16           scram-sha-256
   parameters:
     unix_socket_directories: "/tmp"
-    # Every TCP connection is TLS: replication, the pooler, the drills. Local
-    # connections stay on the unix socket and are unaffected.
+    # Every TCP connection is TLS with the node's certificate from the lab CA: replication, the
+    # pooler, the drills verify it. Local connections stay on the unix socket and are unaffected.
     ssl: "on"
     ssl_cert_file: /etc/patroni/server.crt
     ssl_key_file: /etc/patroni/server.key
+    ssl_ca_file: /etc/patroni/ca.crt

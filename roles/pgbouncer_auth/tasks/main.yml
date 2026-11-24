@@ -4,7 +4,7 @@
 # here on a cluster that is merely still starting.
 - name: Wait for a primary behind the virtual address
   ansible.builtin.command: >-
-    psql -h {{ pg_access_vip }} -p 5000 -U postgres -Atc "select pg_is_in_recovery()"
+    psql "host={{ pg_access_vip }} port=5000 user=postgres sslmode=verify-full sslrootcert=/var/lib/postgresql/ca.crt" -Atc "select pg_is_in_recovery()"
   environment:
     PGPASSWORD: "{{ pg_superuser_password }}"
   register: pgbouncer_auth_probe
@@ -19,12 +19,7 @@
   ansible.builtin.command:
     argv:
       - psql
-      - -h
-      - "{{ pg_access_vip }}"
-      - -p
-      - "5000"
-      - -U
-      - postgres
+      - "host={{ pg_access_vip }} port=5000 user=postgres sslmode=verify-full sslrootcert=/var/lib/postgresql/ca.crt"
       - -v
       - ON_ERROR_STOP=1
       - -Atc

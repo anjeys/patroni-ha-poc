@@ -7,6 +7,23 @@
       - "postgresql-client-{{ postgresql_version }}={{ postgresql_package_version }}"
     state: present
 
+# The lab CA and this balancer's certificate (scripts/lab.sh pki; its SANs carry the VIP): the
+# clients verify PgBouncer by the VIP, PgBouncer verifies the primary by the CA (ADR-0009).
+- name: CA, certificate and key for the clients' TLS
+  ansible.builtin.copy:
+    src: "../../../.pki/{{ item.src }}"
+    dest: "/etc/pgbouncer/{{ item.dest }}"
+    owner: postgres
+    group: postgres
+    mode: "{{ item.mode }}"
+  loop:
+    - {src: ca.crt, dest: ca.crt, mode: "0644"}
+    - {src: "{{ inventory_hostname }}.crt", dest: server.crt, mode: "0644"}
+    - {src: "{{ inventory_hostname }}.key", dest: server.key, mode: "0600"}
+  loop_control:
+    label: "{{ item.dest }}"
+  notify: Restart PgBouncer
+
 - name: Deploy userlist.txt
   ansible.builtin.template:
     src: userlist.txt.j2
@@ -20,6 +37,7 @@
   ansible.builtin.template:
     src: pgbouncer.ini.j2
     dest: /etc/pgbouncer/pgbouncer.ini
+    mode: "0644"
   notify: Restart PgBouncer
 
 - name: Start PgBouncer service

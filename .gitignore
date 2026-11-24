@@ -9,6 +9,7 @@ vault_password_file
 # Generated per lab, never committed
 group_vars/all/secrets.yml
 .ssh/
+.pki/
 
 /evidence/
 
