@@ -55,7 +55,8 @@ The same drills run weekly in CI (`drills` workflow) and on every pull request t
 the cluster's code; each run uploads its `evidence/` as an artifact and prints the table in
 its summary.
 A snapshot from CI run [45432641291](https://github.com/anjeys/patroni-ha-poc/actions/runs/45432641291)
-is committed in [`docs/evidence/`](docs/evidence/).
+is committed in [`docs/evidence/`](docs/evidence/) by the evidence bot after every weekly run
+(ADR-0008); its table is `docs/evidence/SUMMARY.md`, and every tag `v*` is a release carrying it.
 
 ## Failover, measured
 
@@ -180,3 +181,4 @@ The pipeline itself - six lint jobs, the bots, the branch ruleset, Scorecard - i
 - [ADR-0005](docs/adr/0005-fencing-tls-monitoring.md) - watchdog fencing, TLS to PostgreSQL, monitoring with alerts
 - [ADR-0006](docs/adr/0006-branch-pins.md) - a package pin is a branch; the build is read at install time and recorded
 - [ADR-0007](docs/adr/0007-ci-cd.md) - the pipeline of a public repository: every check, every bot, the branch protected
+- [ADR-0008](docs/adr/0008-bots.md) - the lab's own bots: the evidence snapshot, the pins watch, the release
