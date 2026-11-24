@@ -47,6 +47,7 @@ with a SHA-256 the playbook verifies.
 | A killed leader is fenced by the kernel watchdog, and the new leader arms it | `scripts/drill.sh failover`, watchdog section of the evidence | fired 17-19 s after the kill, 1-3 s before the leader key would have expired (`ttl: 20`, `safety_margin: 3`); `/dev/watchdog` held by the new leader |
 | PostgreSQL refuses a connection that is not TLS | `psql "sslmode=disable"` against 5000 | `no pg_hba.conf entry`; replication and the pooler connect with `ssl = t` |
 | Every server certificate is the lab CA's and clients verify it | the drills connect to the VIP with `sslmode=verify-full`; etcd refuses a client without the CA or the password | passes |
+| Nothing listens in plain text: the REST API, the metrics, the stats page serve TLS; the exporter is no superuser; the backup repository is encrypted | HAProxy's checks verify Patroni against the CA, Prometheus scrapes every target over https, `pgbackrest info` reports the cipher | passes |
 | Every monitoring target is up, every rule loaded, nothing firing | `scripts/lab.sh status` | passes |
 | Every installed build is inside its pinned branch, and which one is recorded | `scripts/lab.sh versions` | `evidence/versions-*.json`, `every_build_in_its_branch: true` |
 
@@ -149,8 +150,8 @@ with the watchdog off and the evidence says so.
 
 **The CA is the lab's.** `scripts/lab.sh pki` makes it into `.pki/` (gitignored); on real
 hosts the organisation's CA issues the same certificates. Client certificates (mTLS to
-PostgreSQL) are not issued: passwords over verified TLS (ADR-0009). Patroni's REST API, the
-monitoring endpoints and the backup repository are still as ADR-0005 left them.
+PostgreSQL) are not issued: passwords over verified TLS (ADR-0009, ADR-0010). The passphrase
+of the backup repository is one more generated secret: a lost `.pki/` or secrets file is a reset.
 
 **Alerts go nowhere.** Six rules evaluate and `lab.sh status` asserts them;
 routing them through Alertmanager and drawing them in Grafana is site-specific.
@@ -185,3 +186,4 @@ The pipeline itself - six lint jobs, the bots, the branch ruleset, Scorecard - i
 - [ADR-0007](docs/adr/0007-ci-cd.md) - the pipeline of a public repository: every check, every bot, the branch protected
 - [ADR-0008](docs/adr/0008-bots.md) - the lab's own bots: the evidence snapshot, the pins watch, the release
 - [ADR-0009](docs/adr/0009-pki.md) - the lab's own PKI: etcd over TLS with authentication, PostgreSQL verified by a CA
+- [ADR-0010](docs/adr/0010-periphery-pki.md) - the periphery on the PKI: the REST API, the monitoring, the backup repository
