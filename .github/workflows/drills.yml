@@ -11,18 +11,10 @@ name: drills
   workflow_dispatch:
   schedule:
     - cron: "23 3 * * 1"
+  # every pull request: a required check must exist to be satisfied (003i: an absent one blocks
+  # the merge), so the job always runs and builds the cluster only when a path of the cluster
+  # changed (the "changes" step); a prose-only PR gets a green check in seconds
   pull_request:
-    paths:
-      - .github/workflows/drills.yml
-      - Dockerfile
-      - docker-compose.yml
-      - docker-compose.watchdog.yml
-      - inventory.ini.tpl
-      - playbook.yml
-      - requirements-ci.txt
-      - group_vars/**
-      - roles/**
-      - scripts/**
 permissions:
   contents: read
 concurrency:
@@ -40,12 +32,31 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: Did the cluster change?
+        id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != pull_request ]; then
+            echo "cluster=true" >> "$GITHUB_OUTPUT"
+            echo "not a pull request: the cluster is built"
+            exit 0
+          fi
+          pattern='^(\.github/workflows/drills\.yml|Dockerfile|docker-compose.*\.yml|inventory\.ini\.tpl|playbook\.yml|requirements-ci\.txt|group_vars/|roles/|scripts/)'
+          changed="$(git diff --name-only "origin/$BASE...HEAD" | grep -cE "$pattern" || true)"
+          echo "cluster=$([ "$changed" != 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "$changed cluster path(s) changed against $BASE"
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        if: steps.changes.outputs.cluster == 'true'
         with:
           python-version: "3.13"
           cache: pip
           cache-dependency-path: requirements-ci.txt
       - name: Tools
+        if: steps.changes.outputs.cluster == 'true'
         run: |
           set -euo pipefail
           pip install -r requirements-ci.txt
@@ -61,6 +72,7 @@ jobs:
           # The parameter is not in sysfs; the kernel log is where it shows.
           sudo dmesg | grep "softdog: initialized" | tail -1 || echo "softdog never initialized"
       - name: Up, then prove a second run changes nothing
+        if: steps.changes.outputs.cluster == 'true'
         run: |
           set -euo pipefail
           scripts/lab.sh up
@@ -68,23 +80,27 @@ jobs:
           scripts/lab.sh status
           scripts/lab.sh versions
       - name: Cluster state before the drills
+        if: steps.changes.outputs.cluster == 'true'
         run: |
           docker exec node1 patronictl -c /etc/patroni/config.yml list
           docker exec -u postgres backup pgbackrest --stanza=main info
       - name: Drill - access layer
+        if: steps.changes.outputs.cluster == 'true'
         run: scripts/drill.sh access
       - name: Drill - failover
+        if: steps.changes.outputs.cluster == 'true'
         run: scripts/drill.sh failover
       - name: Drill - point-in-time recovery
+        if: steps.changes.outputs.cluster == 'true'
         run: scripts/drill.sh pitr
       - name: Cluster state after the drills
-        if: always()
+        if: always() && steps.changes.outputs.cluster == 'true'
         run: docker exec node1 patronictl -c /etc/patroni/config.yml list || true
       - name: Evidence summary
-        if: always()
+        if: always() && steps.changes.outputs.cluster == 'true'
         run: python3 scripts/lib/evidence_summary.py | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Evidence
-        if: always()
+        if: always() && steps.changes.outputs.cluster == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: drill-evidence-${{ github.run_id }}
