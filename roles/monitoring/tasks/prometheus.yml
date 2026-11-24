@@ -41,6 +41,59 @@
     mode: "0750"
   loop: [/etc/prometheus, /var/lib/prometheus]
 
+# The lab CA (every scrape verifies its target against it) and this host's certificate (the web
+# listener serves it; scripts/lab.sh status verifies it) - ADR-0010.
+- name: CA, certificate and key for Prometheus
+  ansible.builtin.copy:
+    src: "../../../.pki/{{ item.src }}"
+    dest: "/etc/prometheus/{{ item.dest }}"
+    owner: prometheus
+    group: prometheus
+    mode: "{{ item.mode }}"
+  loop:
+    - {src: ca.crt, dest: ca.crt, mode: "0644"}
+    - {src: "{{ inventory_hostname }}.crt", dest: server.crt, mode: "0644"}
+    - {src: "{{ inventory_hostname }}.key", dest: server.key, mode: "0600"}
+  loop_control:
+    label: "{{ item.dest }}"
+  notify: Restart prometheus
+
+- name: Prometheus web config (TLS), checked by promtool
+  ansible.builtin.template:
+    src: web.yml.j2
+    dest: /etc/prometheus/web.yml
+    owner: prometheus
+    group: prometheus
+    mode: "0640"
+    validate: "/usr/local/bin/promtool check web-config %s"
+  vars:
+    web_cert_file: /etc/prometheus/server.crt
+    web_key_file: /etc/prometheus/server.key
+  notify: Restart prometheus
+
+# The exporter's role: pg_monitor, a password, no superuser. Through the VIP once the cluster
+# answers (this play runs after the access layer); idempotent through DO and ALTER.
+- name: The postgres_exporter role with pg_monitor
+  ansible.builtin.command:
+    argv:
+      - psql
+      - "host={{ pg_access_vip }} port=5000 user=postgres sslmode=verify-full sslrootcert=/var/lib/postgresql/ca.crt"
+      - -v
+      - ON_ERROR_STOP=1
+      - -Atc
+      - |
+        DO $$ BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'postgres_exporter') THEN
+            CREATE ROLE postgres_exporter LOGIN;
+          END IF;
+        END $$;
+        ALTER ROLE postgres_exporter PASSWORD '{{ pg_exporter_password }}';
+        GRANT pg_monitor TO postgres_exporter;
+  environment:
+    PGPASSWORD: "{{ pg_superuser_password }}"
+  changed_when: false
+  no_log: true
+
 # promtool validates before the file lands: a typo in a rule stops the play
 # instead of leaving Prometheus running on the last good configuration.
 - name: Scrape configuration and alerting rules

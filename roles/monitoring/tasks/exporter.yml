@@ -23,13 +23,36 @@
     mode: "0755"
   notify: Restart postgres_exporter
 
-# It runs as postgres over the unix socket: peer authentication, no password
-# in a unit file, and no TLS to configure for a local connection.
+- name: Exporter configuration directory
+  ansible.builtin.file:
+    path: /etc/postgres_exporter
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: "0750"
+
+# TLS with the node's certificate (roles/patroni placed it, readable by postgres - the exporter's
+# user) through the exporter-toolkit web config; Prometheus verifies it against the lab CA (ADR-0010).
+- name: Exporter web config (TLS)
+  ansible.builtin.template:
+    src: web.yml.j2
+    dest: /etc/postgres_exporter/web.yml
+    owner: postgres
+    group: postgres
+    mode: "0640"
+  vars:
+    web_cert_file: /etc/patroni/server.crt
+    web_key_file: /etc/patroni/server.key
+  notify: Restart postgres_exporter
+
+# TCP to the local PostgreSQL over TLS verified against the lab CA, as postgres_exporter - a role
+# with pg_monitor, not the superuser (made once the cluster answers, roles/monitoring on the
+# repository host). The unit carries the role's password: root reads it, nobody else.
 - name: Postgres_exporter unit
   ansible.builtin.template:
     src: postgres_exporter.service.j2
     dest: /etc/systemd/system/postgres_exporter.service
-    mode: "0644"
+    mode: "0600"
   notify: Restart postgres_exporter
 
 - name: Start postgres_exporter

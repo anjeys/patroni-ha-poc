@@ -1,0 +1,5 @@
+# exporter-toolkit web config (ADR-0010): the listener serves TLS with this host's certificate
+# from the lab CA; the scraper verifies it. No client authentication.
+tls_server_config:
+  cert_file: {{ web_cert_file }}
+  key_file: {{ web_key_file }}

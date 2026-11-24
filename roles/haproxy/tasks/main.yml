@@ -4,10 +4,34 @@
     name: "haproxy={{ haproxy_version }}"
     state: present
 
+# The lab CA (the health checks verify Patroni's REST API against it) and this balancer's
+# certificate with its key as one PEM, the form HAProxy binds TLS with (ADR-0010). Read by root at
+# start, so root-owned; the group may read it for a reload.
+- name: The lab CA for the health checks
+  ansible.builtin.copy:
+    src: ../../../.pki/ca.crt
+    dest: /etc/haproxy/ca.crt
+    owner: root
+    group: haproxy
+    mode: "0644"
+  notify: Restart HAProxy
+
+- name: The balancer's certificate and key as one PEM for the stats frontend
+  ansible.builtin.copy:
+    content: "{{ lookup('file', '../../../.pki/' + inventory_hostname + '.crt') }}\n{{ lookup('file', '../../../.pki/' + inventory_hostname + '.key') }}\n"
+    dest: /etc/haproxy/server.pem
+    owner: root
+    group: haproxy
+    mode: "0640"
+  no_log: true
+  notify: Restart HAProxy
+
 - name: Deploy HAProxy configuration
   ansible.builtin.template:
     src: haproxy.cfg.j2
     dest: /etc/haproxy/haproxy.cfg
+    mode: "0644"
+    validate: haproxy -c -f %s
   notify: Restart HAProxy
 
 - name: Start HAProxy service
